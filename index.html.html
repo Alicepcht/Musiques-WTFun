@@ -1,0 +1,200 @@
+<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <title>Soundboard Ultra‑Simple (Playlist partagée)</title>
+  <style>
+    :root { --bg:#0b0b10; --card:#151621; --acc:#6EE7F9; --txt:#f6f7fb; --muted:#a9afc3; }
+    html,body{margin:0;height:100%;background:var(--bg);color:var(--txt);font-family:system-ui,-apple-system,Segoe UI,Roboto,Inter,Helvetica,Arial,sans-serif}
+    header{position:sticky;top:0;background:linear-gradient(180deg,#0b0b10 60%,#0b0b1000);padding:16px 16px 8px;border-bottom:1px solid #222}
+    h1{font-size:18px;margin:0 0 6px}
+    .row{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+    .btn{appearance:none;border:0;border-radius:14px;padding:12px 16px;background:#222;color:#fff;font-weight:600;cursor:pointer}
+    .btn.acc{background:var(--acc);color:#001018}
+    .btn.small{padding:8px 10px;font-size:14px}
+    .btn:active{transform:translateY(1px)}
+    .grid{display:grid;grid-template-columns:repeat(2,1fr);gap:10px;padding:12px}
+    @media(min-width:760px){.grid{grid-template-columns:repeat(4,1fr)}}
+    .card{background:var(--card);border:1px solid #24263a;border-radius:16px;padding:12px;display:flex;flex-direction:column;gap:10px;min-height:110px}
+    .title{font-weight:700;font-size:14px;line-height:1.2}
+    .muted{color:var(--muted);font-size:12px}
+    .controls{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+    footer{padding:16px;color:#8891a6;font-size:12px;text-align:center}
+    .pill{background:#1f2338;color:#a9afc3;border-radius:999px;padding:4px 8px;font-size:12px}
+  </style>
+</head>
+<body>
+  <header>
+    <h1>🎛️ Soundboard Ultra‑Simple — Playlist partagée</h1>
+    <div class="row">
+      <button class="btn acc" id="reload">🔄 Recharger la liste</button>
+      <button class="btn small" id="stopAll">⏹️ Stop tout</button>
+      <label class="btn small" title="Empêche la mise en veille (si supporté)"><input type="checkbox" id="wakelock" /> Écran allumé</label>
+      <label class="btn small"><input type="checkbox" id="autonext" /> Enchaîner la suivante</label>
+      <div style="margin-left:auto;display:flex;align-items:center;gap:8px">
+        <span class="muted">Volume</span>
+        <input id="volume" type="range" min="0" max="1" step="0.01" value="1" />
+      </div>
+    </div>
+    <div id="status" class="row" style="margin-top:8px"></div>
+  </header>
+
+  <main class="grid" id="grid"></main>
+
+  <footer>
+    Placez vos fichiers audio dans <code>sounds/</code> et décrivez-les dans <code>tracks.json</code>. Ajoutez cette page à l’écran d’accueil pour un usage plein écran.
+  </footer>
+
+  <template id="cardTpl">
+    <div class="card">
+      <div class="title"></div>
+      <div class="muted time"></div>
+      <div class="controls">
+        <button class="btn play">▶️ Lire</button>
+        <button class="btn small back5">↤ −5s</button>
+        <button class="btn small jump10">↦ +10s</button>
+      </div>
+    </div>
+  </template>
+
+  <script>
+    const grid = document.getElementById('grid');
+    const stopAllBtn = document.getElementById('stopAll');
+    const vol = document.getElementById('volume');
+    const status = document.getElementById('status');
+    const reloadBtn = document.getElementById('reload');
+    const autoNextChk = document.getElementById('autonext');
+
+    let audios = []; // {audio, start, btn}
+
+    function fmt(t){
+      if(!isFinite(t) || t<0) t = 0;
+      const m = Math.floor(t/60).toString().padStart(2,'0');
+      const s = Math.floor(t%60).toString().padStart(2,'0');
+      return `${m}:${s}`;
+    }
+
+    function parseStart(v){
+      if(typeof v === 'number') return Math.max(0, v);
+      if(typeof v === 'string'){
+        const m = v.trim().match(/^(\d{1,2}):(\d{2})(?::(\d{2}))?$/);
+        if(m){
+          const h = m[3] ? parseInt(m[1]) : 0;
+          const mm = m[3] ? parseInt(m[2]) : parseInt(m[1]);
+          const ss = m[3] ? parseInt(m[3]) : parseInt(m[2]);
+          return (h*3600 + mm*60 + ss) | 0;
+        }
+        const secs = Number(v);
+        if(!isNaN(secs)) return Math.max(0, secs);
+      }
+      return 0;
+    }
+
+    function setStatus(msg, ok=true){
+      status.innerHTML = `<span class="pill" style="${ok? '':'background:#3b1f1f;color:#f2bcbc'}">${msg}</span>`;
+    }
+
+    function makeCard(track, index){
+      const tpl = document.getElementById('cardTpl');
+      const node = tpl.content.firstElementChild.cloneNode(true);
+      const title = node.querySelector('.title');
+      const time = node.querySelector('.time');
+      const play = node.querySelector('.play');
+      const jump10 = node.querySelector('.jump10');
+      const back5 = node.querySelector('.back5');
+
+      const start = parseStart(track.start||0);
+      title.textContent = track.title || (track.src||'').split('/').pop().replace(/\.[^.]+$/, '');
+
+      const audio = new Audio(track.src);
+      audio.preload = 'auto';
+      audio.volume = parseFloat(localStorage.getItem('sb_volume')||'1');
+      let primed = false; // première lecture → saute au start
+
+      audio.addEventListener('timeupdate',()=>{
+        time.textContent = `${fmt(audio.currentTime)} / ${fmt(audio.duration||0)}${start?` · start ${fmt(start)}`:''}`;
+      });
+      audio.addEventListener('ended',()=>{
+        play.textContent='▶️ Lire';
+        if(autoNextChk.checked){
+          const next = audios[index+1];
+          if(next){
+            // Stop all others, then play next
+            audios.forEach(o=>{ if(o!==next){ o.audio.pause(); o.audio.currentTime=0; if(o.btn) o.btn.textContent='▶️ Lire'; }});
+            if(next.audio.readyState < 2){ next.audio.addEventListener('canplay', ()=>{ next.btn.click(); }, {once:true}); }
+            else{ next.btn.click(); }
+          }
+        }
+      });
+
+      play.addEventListener('click',()=>{
+        // stop others
+        audios.forEach(o=>{ if(o.audio!==audio){ o.audio.pause(); o.audio.currentTime=0; if(o.btn) o.btn.textContent='▶️ Lire'; }});
+        if(audio.paused){
+          if(!primed){ audio.currentTime = start; primed = true; }
+          audio.play(); play.textContent='⏸️ Pause';
+        } else {
+          audio.pause(); play.textContent='▶️ Lire';
+        }
+      });
+
+      back5.addEventListener('click',()=>{ audio.currentTime = Math.max(0, audio.currentTime-5); });
+      jump10.addEventListener('click',()=>{ audio.currentTime = Math.min((audio.duration||0), audio.currentTime+10); });
+
+      audios[index] = { audio, start, btn: play };
+      grid.appendChild(node);
+    }
+
+    async function loadTracks(){
+      setStatus('Chargement de tracks.json…');
+      audios.forEach(o=> o.audio.pause());
+      audios = [];
+      grid.innerHTML = '';
+      try{
+        const res = await fetch('tracks.json', {cache:'no-store'});
+        if(!res.ok) throw new Error('HTTP '+res.status);
+        const list = await res.json();
+        if(!Array.isArray(list) || !list.length){
+          setStatus('tracks.json vide ou invalide', false);
+          return;
+        }
+        list.forEach((t,i)=> makeCard(t,i));
+        setStatus(`${list.length} piste(s) chargée(s)`);
+      }catch(e){
+        console.error(e);
+        setStatus('Impossible de charger tracks.json', false);
+      }
+    }
+
+    stopAllBtn.addEventListener('click',()=>{
+      audios.forEach(o=>{ o.audio.pause(); o.audio.currentTime=0; o.btn && (o.btn.textContent='▶️ Lire'); });
+    });
+
+    vol.addEventListener('input',()=>{
+      const v = parseFloat(vol.value);
+      localStorage.setItem('sb_volume', String(v));
+      audios.forEach(o=> o.audio.volume = v);
+    });
+    vol.value = localStorage.getItem('sb_volume')||'1';
+
+    reloadBtn.addEventListener('click', loadTracks);
+
+    // Optional Wake Lock (keeps screen on if supported)
+    const wl = document.getElementById('wakelock');
+    let wakeLock = null;
+    async function requestWakeLock(){
+      try{ wakeLock = await navigator.wakeLock.request('screen');
+        wakeLock.addEventListener('release',()=>{});
+      }catch(e){ console.log('WakeLock non supporté', e); }
+    }
+    wl.addEventListener('change',()=>{
+      if(wl.checked){ requestWakeLock(); }
+      else{ if(wakeLock){ wakeLock.release(); wakeLock=null; } }
+    });
+
+    // Auto-load at start
+    loadTracks();
+  </script>
+</body>
+</html>
