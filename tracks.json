@@ -4,7 +4,6 @@
   { "title": "Major Lazer", "src": "sounds/03-major-lazer.mp3" },
   { "title": "Gims – Nia Niaô", "src": "sounds/04-gims-ninao.mp3" },
   { "title": "Macklemore – Can’t Hold Us", "src": "sounds/05-cant-hold-us.mp3" },
-  { "title": "Victoria Monét – On My Mama", "src": "sounds/05-victoria-monet-on-my-mama.mp3" },
   { "title": "Miley Cyrus – Flowers", "src": "sounds/06-miley-cyrus-flowers.mp3" },
   { "title": "SCH – Bande Organisée", "src": "sounds/07-sch-bande-organisee.mp3" },
   { "title": "Flo Rida", "src": "sounds/08-flo-rida.mp3" },
@@ -18,4 +17,5 @@
   { "title": "Sevdaliza – ALIBI", "src": "sounds/16-sevdaliza-alibi.mp3" },
   { "title": "Trinix & One-T – The Magic Key", "src": "sounds/17-trinix-one-t-magic-key.mp3" },
   { "title": "Theodora – Zou Bisou", "src": "sounds/18-theodora-zou-bisou.mp3" }
+  { "title": "Victoria Monét – On My Mama", "src": "sounds/19-victoria-monet-on-my-mama.mp3" },
 ]
