@@ -3,30 +3,65 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
-  <title>Soundboard Ultra‑Simple (Playlist partagée)</title>
+  <title>Soundboard Ultra-Simple (Playlist partagée)</title>
   <style>
-    :root { --bg:#0b0b10; --card:#151621; --acc:#6EE7F9; --txt:#f6f7fb; --muted:#a9afc3; }
-    html,body{margin:0;height:100%;background:var(--bg);color:var(--txt);font-family:system-ui,-apple-system,Segoe UI,Roboto,Inter,Helvetica,Arial,sans-serif}
-    header{position:sticky;top:0;background:linear-gradient(180deg,#0b0b10 60%,#0b0b1000);padding:16px 16px 8px;border-bottom:1px solid #222}
+    /* Couleurs */
+    :root{
+      --bg:#1b1a37;          /* fond du site */
+      --card:#151621;
+      --acc:#6EE7F9;
+      --txt:#f6f7fb;
+      --muted:#a9afc3;
+      --play:#aa00ff;        /* couleur du bouton Lire */
+    }
+
+    html,body{
+      margin:0;height:100%;
+      background:var(--bg);
+      color:var(--txt);
+      font-family:system-ui,-apple-system,Segoe UI,Roboto,Inter,Helvetica,Arial,sans-serif
+    }
+    header{
+      position:sticky;top:0;
+      background:linear-gradient(180deg,var(--bg) 60%,#0000);
+      padding:16px 16px 8px;border-bottom:1px solid #222
+    }
     h1{font-size:18px;margin:0 0 6px}
     .row{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
-    .btn{appearance:none;border:0;border-radius:14px;padding:12px 16px;background:#222;color:#fff;font-weight:600;cursor:pointer}
+
+    .btn{
+      appearance:none;border:0;border-radius:14px;
+      padding:12px 16px;background:#222;color:#fff;
+      font-weight:600;cursor:pointer
+    }
     .btn.acc{background:var(--acc);color:#001018}
     .btn.small{padding:8px 10px;font-size:14px}
     .btn:active{transform:translateY(1px)}
+
+    /* Cartes et grille */
     .grid{display:grid;grid-template-columns:repeat(2,1fr);gap:10px;padding:12px}
     @media(min-width:760px){.grid{grid-template-columns:repeat(4,1fr)}}
     .card{background:var(--card);border:1px solid #24263a;border-radius:16px;padding:12px;display:flex;flex-direction:column;gap:10px;min-height:110px}
     .title{font-weight:700;font-size:14px;line-height:1.2}
     .muted{color:var(--muted);font-size:12px}
     .controls{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+
+    /* Style spécifique du bouton Lire/Pause */
+    .btn.play{
+      background:var(--play);
+      color:#fff;
+      box-shadow:0 0 0 0 rgba(170,0,255,.4);
+      transition:box-shadow .2s ease, transform .05s ease;
+    }
+    .btn.play:active{ transform:translateY(1px); box-shadow:0 0 0 6px rgba(170,0,255,.15); }
+
     footer{padding:16px;color:#8891a6;font-size:12px;text-align:center}
     .pill{background:#1f2338;color:#a9afc3;border-radius:999px;padding:4px 8px;font-size:12px}
   </style>
 </head>
 <body>
   <header>
-    <h1>🎛️ Soundboard Ultra‑Simple — Playlist partagée</h1>
+    <h1>🎛️ Soundboard Ultra-Simple — Playlist partagée</h1>
     <div class="row">
       <button class="btn acc" id="reload">🔄 Recharger la liste</button>
       <button class="btn small" id="stopAll">⏹️ Stop tout</button>
@@ -46,14 +81,13 @@
     Placez vos fichiers audio dans <code>sounds/</code> et décrivez-les dans <code>tracks.json</code>. Ajoutez cette page à l’écran d’accueil pour un usage plein écran.
   </footer>
 
+  <!-- retiré les boutons -5s / +10s -->
   <template id="cardTpl">
     <div class="card">
       <div class="title"></div>
       <div class="muted time"></div>
       <div class="controls">
         <button class="btn play">▶️ Lire</button>
-        <button class="btn small back5">↤ −5s</button>
-        <button class="btn small jump10">↦ +10s</button>
       </div>
     </div>
   </template>
@@ -101,8 +135,6 @@
       const title = node.querySelector('.title');
       const time = node.querySelector('.time');
       const play = node.querySelector('.play');
-      const jump10 = node.querySelector('.jump10');
-      const back5 = node.querySelector('.back5');
 
       const start = parseStart(track.start||0);
       title.textContent = track.title || (track.src||'').split('/').pop().replace(/\.[^.]+$/, '');
@@ -120,7 +152,6 @@
         if(autoNextChk.checked){
           const next = audios[index+1];
           if(next){
-            // Stop all others, then play next
             audios.forEach(o=>{ if(o!==next){ o.audio.pause(); o.audio.currentTime=0; if(o.btn) o.btn.textContent='▶️ Lire'; }});
             if(next.audio.readyState < 2){ next.audio.addEventListener('canplay', ()=>{ next.btn.click(); }, {once:true}); }
             else{ next.btn.click(); }
@@ -129,7 +160,6 @@
       });
 
       play.addEventListener('click',()=>{
-        // stop others
         audios.forEach(o=>{ if(o.audio!==audio){ o.audio.pause(); o.audio.currentTime=0; if(o.btn) o.btn.textContent='▶️ Lire'; }});
         if(audio.paused){
           if(!primed){ audio.currentTime = start; primed = true; }
@@ -138,9 +168,6 @@
           audio.pause(); play.textContent='▶️ Lire';
         }
       });
-
-      back5.addEventListener('click',()=>{ audio.currentTime = Math.max(0, audio.currentTime-5); });
-      jump10.addEventListener('click',()=>{ audio.currentTime = Math.min((audio.duration||0), audio.currentTime+10); });
 
       audios[index] = { audio, start, btn: play };
       grid.appendChild(node);
@@ -178,9 +205,6 @@
     });
     vol.value = localStorage.getItem('sb_volume')||'1';
 
-    reloadBtn.addEventListener('click', loadTracks);
-
-    // Optional Wake Lock (keeps screen on if supported)
     const wl = document.getElementById('wakelock');
     let wakeLock = null;
     async function requestWakeLock(){
@@ -192,6 +216,8 @@
       if(wl.checked){ requestWakeLock(); }
       else{ if(wakeLock){ wakeLock.release(); wakeLock=null; } }
     });
+
+    document.getElementById('reload').addEventListener('click', loadTracks);
 
     // Auto-load at start
     loadTracks();
